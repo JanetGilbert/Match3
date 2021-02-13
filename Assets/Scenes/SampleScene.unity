@@ -132,6 +132,7 @@ GameObject:
   - component: {fileID: 519420032}
   - component: {fileID: 519420031}
   - component: {fileID: 519420029}
+  - component: {fileID: 519420030}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -147,6 +148,18 @@ AudioListener:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 519420028}
   m_Enabled: 1
+--- !u!114 &519420030
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 519420028}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c8f91ca68d29744e7a8f1bf21df1c84b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!20 &519420031
 Camera:
   m_ObjectHideFlags: 0
@@ -229,7 +242,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1508809087}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.33519852, y: -1.025342, z: -0.59175754}
+  m_LocalPosition: {x: 0.33519852, y: -1.025342, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
@@ -247,3 +260,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c4d9d7daab892484b80cf39e367c4982, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  animalPrefab: {fileID: 1105941791682275886, guid: c0cd9e16e0363f24185977226262470f,
+    type: 3}
+  gridX: 5
+  gridY: 5
+  gridSpacing: 2
+  animalDefs:
+  - type: 0
+    sprite: {fileID: 21300000, guid: ade9f6bd285fefd4ea4ee17f85aba459, type: 3}
+  - type: 1
+    sprite: {fileID: 21300000, guid: 203e0f689a55429458374d597e5d36c2, type: 3}
+  - type: 2
+    sprite: {fileID: 21300000, guid: fe3824c870d44c241a77c8b85fee8752, type: 3}
+  - type: 3
+    sprite: {fileID: 21300000, guid: f015b307b3fd95447aaf1418f3e1c7cd, type: 3}
+  - type: 4
+    sprite: {fileID: 21300000, guid: f2fe338c0fa638d4f83115868483969d, type: 3}
+  - type: 5
+    sprite: {fileID: 21300000, guid: 8496117e3222f2b4880494448ba0a630, type: 3}
