@@ -10,7 +10,7 @@ public struct AnimalDef
     public Sprite sprite;
 }
 
-public enum BoardState {Idle, Swapping, Matching, Falling};
+public enum BoardState {Idle, Matching, Falling};
 
 
 public class GameBoard : MonoBehaviour
@@ -23,17 +23,16 @@ public class GameBoard : MonoBehaviour
     public int gridY; // Vertical grid size.
     public float gridSpacing; // Space between animals in grid.
 
-    public AnimalDef [] animalDefs;
+    public AnimalDef[] animalDefs;
 
-    private Animal [,] animalGrid;
+    private Animal[,] animalGrid;
 
     // For checking matches
     private bool[,] scratchGrid; // Grid to ensure we don't check a square twice.
     private List<Animal> matchList; // Animals in current match
-    private List<Animal> removeList; // Matched animals to remove
 
     // State
-    private Animal selectedAnimal;
+    // private Animal selectedAnimal;
     private BoardState state;
 
     // Constants
@@ -44,35 +43,64 @@ public class GameBoard : MonoBehaviour
         InitGrid();
         state = BoardState.Idle;
         matchList = new List<Animal>();
-        removeList = new List<Animal>();
 
     }
 
-    
+
     void Update()
     {
-        if (state == BoardState.Swapping)
+        if (state == BoardState.Matching)
         {
-            bool stillSwapping = false;
+            bool stillMatching = false;
 
             for (int x = 0; x < gridX; x++)
             {
                 for (int y = 0; y < gridY; y++)
                 {
-                    if (animalGrid[x, y].State == AnimalState.Moving)
+                    if (animalGrid[x, y] != null && animalGrid[x, y].State == AnimalState.Matching)
                     {
-                        stillSwapping = true;
+                        if (animalGrid[x, y].IsLerpFinished())
+                        {
+                            Destroy(animalGrid[x, y].gameObject);
+                            animalGrid[x, y] = null;
+                        }
+                        else
+                        {
+                            stillMatching = true;
+                        }
                     }
                 }
             }
 
-            if (!stillSwapping)
+            if (!stillMatching)
             {
-                state = BoardState.Idle;
-
-                RemoveAllMatches();
-                //AddNewAnimals();
+                SetBoardFalling();
+                FillEmptySquares();
                 state = BoardState.Falling;
+            }
+        }
+        else if (state == BoardState.Falling)
+        {
+            bool stillFalling = false;
+
+            for (int x = 0; x < gridX; x++)
+            {
+                for (int y = 0; y < gridY; y++)
+                {
+                    if (animalGrid[x, y] != null)
+                    {
+                        if (animalGrid[x, y].State == AnimalState.Moving && !animalGrid[x, y].IsLerpFinished())
+                        {
+                            stillFalling = true;
+                        }
+                    }
+                }
+            }
+
+            if (!stillFalling)
+            {
+                
+                state = BoardState.Idle;
             }
         }
     }
@@ -126,45 +154,20 @@ public class GameBoard : MonoBehaviour
         }
     }
 
-    private void RemoveAllMatches()
+    private Animal MakeRandomAnimal(int x, int y)
     {
-        bool removed = false;
+        Animal newAnimal  = Instantiate(animalPrefab, new Vector3(x, y, 0), Quaternion.identity, this.transform);
+        newAnimal.name = "Animal_" + x + "_" + y;
+        newAnimal.X = x;
+        newAnimal.Y = y;
 
-        removeList.Clear();
+        int numAnimalTypes = AnimalType.GetNames(typeof(AnimalType)).Length;
+        newAnimal.Type = (AnimalType)Random.Range(0, numAnimalTypes);
 
-        for (int x = 0; x < gridX; x++)
-        {
-            for (int y = 0; y < gridY; y++)
-            {
-                ClearMatchScratch();
-                CheckMatch(x, y, animalGrid[x, y].Type);
-                if (matchList.Count > MATCH_SIZE)
-                {
-                    removed = true;
-                    foreach (Animal a in matchList)
-                    {
-                        removeList.Add(a);
-                    }
-                }
-            }
-        }
+        newAnimal.transform.position = transform.position + new Vector3(x * gridSpacing, y * gridSpacing, 0.0f);
+        newAnimal.transform.parent = transform;
 
-
-        foreach (Animal a in removeList)
-        {
-            a.StartRemoving();
-        }
-
-        if (removeList.Count > 0)
-        {
-            state = BoardState.Matching;
-        }
-        else
-        {
-            state = BoardState.Idle;
-        }
-
-        removeList.Clear();
+        return newAnimal;
     }
 
     private void ClearMatchScratch()
@@ -189,6 +192,11 @@ public class GameBoard : MonoBehaviour
             return; // Off the board
         }
 
+        if (animalGrid[x, y] == null)
+        {
+            return; // Empty square
+        }
+
         if (animalGrid[x, y].Type != typeMatch)
         {
             return; // Not a match
@@ -203,7 +211,7 @@ public class GameBoard : MonoBehaviour
 
         CheckMatch(x - 1, y, typeMatch); // Recursively call this function.
         CheckMatch(x + 1, y, typeMatch);
-        CheckMatch(x, y  - 1, typeMatch);
+        CheckMatch(x, y - 1, typeMatch);
         CheckMatch(x, y + 1, typeMatch);
 
         matchList.Add(animalGrid[x, y]);
@@ -217,46 +225,22 @@ public class GameBoard : MonoBehaviour
             return; // Can't interact with board unless in idle state.
         }
 
-        if (animalGrid[x, y] == selectedAnimal)
-        {
-            return;
-        }
+        ClearMatchScratch();
+        CheckMatch(x, y, animalGrid[x, y].Type);
 
-        if (selectedAnimal != null)
+        if (matchList.Count >= MATCH_SIZE)
         {
-            Swap(animalGrid[x, y], selectedAnimal);
-            selectedAnimal.Selected(false);
-            selectedAnimal = null;
+            foreach (Animal a in matchList)
+            {
+                a.StartRemoving();
+            }
+
+            state = BoardState.Matching;
         }
         else
         {
-            selectedAnimal = animalGrid[x, y];
-            selectedAnimal.Selected(true);
+            state = BoardState.Idle;
         }
-    }
-
-    public void Swap(Animal a1, Animal a2)
-    {
-        a2.MoveTo(a1);
-        a1.MoveTo(a2);
-
-        int x1 = a1.X;
-        int y1 = a1.Y;
-        int x2 = a2.X;
-        int y2 = a2.Y;
-
-        Animal temp = a1;
-        animalGrid[x1, y1] = a2;
-        animalGrid[x2, y2] = temp;
-
-        animalGrid[x1, y1].X = x1;
-        animalGrid[x1, y1].Y = y1;
-
-        animalGrid[x2, y2].X = x2;
-        animalGrid[x2, y2].Y = y2;
-
-        state = BoardState.Swapping;
-
     }
 
     public Sprite GetAnimalSprite(AnimalType type)
@@ -270,5 +254,81 @@ public class GameBoard : MonoBehaviour
         }
 
         return null;
+    }
+
+    private void SetBoardFalling()
+    {
+        state = BoardState.Falling;
+
+        for (int x = 0; x < gridX; x++)
+        {
+            int fallDistance = 0;
+
+            for (int y = 0; y < gridY; y++)
+            {
+                if (animalGrid[x, y] == null)
+                {
+                    fallDistance++;
+                }
+                else if (fallDistance > 0)
+                {
+                    Vector3 start = animalGrid[x, y].transform.position;
+                    Vector3 dest = start - new Vector3(0.0f, fallDistance * gridSpacing, 0.0f);
+                    animalGrid[x, y].SetFalling(fallDistance, start, dest);
+                    SwapAnimalsInGrid(x, y, x, y - fallDistance);
+                }
+            }
+        }
+    }
+
+    private void FillEmptySquares()
+    {
+        for (int x = 0; x < gridX; x++)
+        {
+            int fallDistance = 0;
+            // Calculate distance to fall
+            for (int y = 0; y < gridY; y++)
+            {
+                if (animalGrid[x, y] == null)
+                {
+                    fallDistance++;
+                }
+            }
+
+            for (int y = 0; y < gridY; y++)
+            {
+                if (animalGrid[x, y] == null)
+                {
+                    animalGrid[x, y] = MakeRandomAnimal(x, y);
+
+                    Vector3 dest = animalGrid[x, y].transform.position;
+                    Vector3 start = dest + new Vector3(0.0f, fallDistance * gridSpacing, 0.0f);
+                    animalGrid[x, y].transform.position = start;
+                    animalGrid[x, y].SetFalling(fallDistance, start, dest);
+                }
+            }
+        }
+    }
+
+    // Swap two animals in grid.
+    private void SwapAnimalsInGrid(int x1, int y1, int x2, int y2)
+    {
+        Animal temp = animalGrid[x1, y1];  // Swapping two objects requires a temporary variable
+        animalGrid[x1, y1] = animalGrid[x2, y2];
+        animalGrid[x2, y2] = temp;
+
+        if (animalGrid[x1, y1] != null)
+        {
+            animalGrid[x1, y1].X = x1;
+            animalGrid[x1, y1].Y = y1;
+            animalGrid[x1, y1].name = "Animal_" + x1 + "_" + y1;
+        }
+
+        if (animalGrid[x2, y2] != null)
+        {
+            animalGrid[x2, y2].X = x2;
+            animalGrid[x2, y2].Y = y2;
+            animalGrid[x2, y2].name = "Animal_" + x2 + "_" + y2;
+        }
     }
 }

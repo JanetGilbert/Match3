@@ -78,7 +78,7 @@ public class Animal : MonoBehaviour
     private float lerpTimeMax; // Lerp maximum
 
     // Constants
-    private const float SWAP_LERP_TIME = 1.0f;
+    private const float FALL_LERP_TIME = 0.2f;
     private const float MATCH_LERP_TIME = 0.5f;
 
     void Awake()
@@ -111,40 +111,23 @@ public class Animal : MonoBehaviour
             if (lerpTime > lerpTimeMax)
             {
                 lerpTime = lerpTimeMax;
-                State = AnimalState.Idle;
+              
             }
 
             transform.localScale = Vector3.Lerp(lerpOrigin, lerpTarget, lerpTime / lerpTimeMax);
         }
     }
 
+
+    public bool IsLerpFinished()
+    {
+        return lerpTime == lerpTimeMax;
+    }
+
     private void OnMouseUp()
     {
         board.Select(X, Y);
     }
-
-    public void Selected(bool isSelected)
-    {
-        if (isSelected)
-        {
-            sprRenderer.color = Color.red;
-        }
-        else
-        {
-            sprRenderer.color = Color.white;
-        }
-    }
-
-
-    public void MoveTo(Animal target)
-    {
-        lerpOrigin = transform.position;
-        lerpTarget = target.transform.position;
-        lerpTime = 0.0f;
-        State = AnimalState.Moving;
-        lerpTimeMax = SWAP_LERP_TIME;
-    }
-
 
     public void StartRemoving()
     {
@@ -154,5 +137,14 @@ public class Animal : MonoBehaviour
         lerpTime = 0.0f;
         lerpTimeMax = MATCH_LERP_TIME;
 
+    }
+
+    public void SetFalling(int dist, Vector3 start, Vector3 destination)
+    {
+        State = AnimalState.Moving;
+        lerpOrigin = start;
+        lerpTarget = destination;
+        lerpTime = 0.0f;
+        lerpTimeMax = FALL_LERP_TIME * dist;
     }
 }

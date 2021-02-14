@@ -262,8 +262,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   animalPrefab: {fileID: 1105941791682275886, guid: c0cd9e16e0363f24185977226262470f,
     type: 3}
-  gridX: 5
-  gridY: 5
+  gridX: 8
+  gridY: 8
   gridSpacing: 2
   animalDefs:
   - type: 0
