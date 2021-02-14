@@ -18,21 +18,22 @@ public class CameraFit : MonoBehaviour
 
     // Based on https://answers.unity.com/questions/1231701/fitting-bounds-into-orthographic-2d-camera.html
     // User Satchel82
-    public void Fit(Bounds bounds)
+    public void Fit(Rect rect)
     {
+  
         float screenRatio = (float)Screen.width / (float)Screen.height;
-        float targetRatio = bounds.size.x / bounds.size.y;
+        float targetRatio = rect.width / rect.height;
 
         if (screenRatio >= targetRatio)
         {
-            Camera.main.orthographicSize = bounds.size.y / 2;
+            Camera.main.orthographicSize = rect.height / 2;
         }
         else
         {
             float differenceInSize = targetRatio / screenRatio;
-            Camera.main.orthographicSize = bounds.size.y / 2 * differenceInSize;
+            Camera.main.orthographicSize = rect.height / 2 * differenceInSize;
         }
 
-        transform.position = new Vector3(bounds.center.x, bounds.center.y, -1f);
+        transform.position = new Vector3(rect.x + (rect.width/2.0f), rect.y + (rect.height / 2.0f), -1f);
     }
 }
