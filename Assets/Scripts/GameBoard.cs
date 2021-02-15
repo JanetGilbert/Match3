@@ -2,54 +2,58 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// For mapping the sprites to the animal types.
-[System.Serializable]
+// This struct enables mapping the animal sprites to the animal types.
+[System.Serializable] // To set a struct in the editor, it must be marked as Serializable.
 public struct AnimalDef
 {
     public AnimalType type;
     public Sprite sprite;
 }
 
-public enum BoardState {Idle, Matching, Falling};
+public enum BoardState {Idle, Matching, Falling}; // The states that the board can be in.
 
-
+/* This is the master control object for the bubble popping game. 
+ * It contains and initializes the game pieces (animals)
+ * manages the states,
+ * and interprets input from the player.
+ */
 public class GameBoard : MonoBehaviour
 {
-
-
     // Set in Editor
-    public Animal animalPrefab; // Prefab of animal game piece.
-    public int gridX; // Horizontal grid size.
-    public int gridY; // Vertical grid size.
-    public float gridSpacing; // Space between animals in grid.
-
+    [Header("Prefab of animal game piece")]
+    public Animal animalPrefab; 
+    [Header("Grid size")]
+    public int gridX; // Horizontal 
+    public int gridY; // Vertical 
+    [Header("Space between the animals in grid")]
+    public float gridSpacing;
+    [Header("How many animals make a match?")]
+    public int matchSize = 3;
+    [Header("Map between animal types and animal sprites")]
     public AnimalDef[] animalDefs;
 
+    // The board
     private Animal[,] animalGrid;
 
     // For checking matches
     private bool[,] scratchGrid; // Grid to ensure we don't check a square twice.
-    private List<Animal> matchList; // Animals in current match
+    private List<Animal> matchList; // Animals in current match.
 
     // State
-    // private Animal selectedAnimal;
     private BoardState state;
-
-    // Constants
-    private const int MATCH_SIZE = 3;
 
     void Start()
     {
         InitGrid();
-        state = BoardState.Idle;
+        
         matchList = new List<Animal>();
-
     }
 
 
     void Update()
     {
-        if (state == BoardState.Matching)
+        // Update states.
+        if (state == BoardState.Matching) // Matching State
         {
             bool stillMatching = false;
 
@@ -59,6 +63,7 @@ public class GameBoard : MonoBehaviour
                 {
                     if (animalGrid[x, y] != null && animalGrid[x, y].State == AnimalState.Matching)
                     {
+                        // Destroy animal when shrinking animation is finished.
                         if (animalGrid[x, y].IsLerpFinished())
                         {
                             Destroy(animalGrid[x, y].gameObject);
@@ -71,7 +76,7 @@ public class GameBoard : MonoBehaviour
                     }
                 }
             }
-
+            // Change to falling state when all matched animals have disappeared.
             if (!stillMatching)
             {
                 SetBoardFalling();
@@ -79,7 +84,7 @@ public class GameBoard : MonoBehaviour
                 state = BoardState.Falling;
             }
         }
-        else if (state == BoardState.Falling)
+        else if (state == BoardState.Falling) // Falling state
         {
             bool stillFalling = false;
 
@@ -97,6 +102,7 @@ public class GameBoard : MonoBehaviour
                 }
             }
 
+            // Change to idle state when all animals have fallen into place.
             if (!stillFalling)
             {
                 
@@ -105,33 +111,63 @@ public class GameBoard : MonoBehaviour
         }
     }
 
+    // Interact with board by selecting animal object.
+    public void Select(int x, int y)
+    {
+        if (state != BoardState.Idle)
+        {
+            return; // Can't interact with board unless in idle state.
+        }
+
+        // Check whether the animal that was clicked is part of a group of x of the same type.
+        ClearMatchScratch();
+        CheckMatch(x, y, animalGrid[x, y].Type);
+
+        // If a matching animal group was found, remove them.
+        if (matchList.Count >= matchSize)
+        {
+            foreach (Animal a in matchList)
+            {
+                a.StartRemoving();
+            }
+
+            state = BoardState.Matching;
+        }
+    }
+
+    // Find the sprite that matches the animal type.
+    public Sprite GetAnimalSprite(AnimalType type)
+    {
+        foreach (AnimalDef def in animalDefs)
+        {
+            if (def.type == type)
+            {
+                return def.sprite;
+            }
+        }
+
+        return null;
+    }
+
+    /*********************/
+    /* PRIVATE FUNCTIONS */
+    /*********************/
+
+    // Create a grid of animal objects and initialize it randomly.
     private void InitGrid()
     {
-        float animalPosX = transform.position.x;
-        float animalPosY = transform.position.y;
-
         scratchGrid = new bool[gridX, gridY];
 
-        // Create random grid.
+        // Create random grid of animals.
         animalGrid = new Animal[gridX, gridY];
 
         for (int x = 0; x < gridX; x++)
         {
             for (int y = 0; y < gridY; y++)
             {
-                animalGrid[x, y] = Instantiate(animalPrefab, new Vector3(animalPosX, animalPosY, 0), Quaternion.identity, this.transform);
-                animalGrid[x, y].name = "Animal_" + x + "_" + y;
-                animalGrid[x, y].X = x;
-                animalGrid[x, y].Y = y;
-
-                animalPosY += gridSpacing;
+                animalGrid[x, y] = MakeRandomAnimal(x, y);
             }
-
-            animalPosY = transform.position.y;
-            animalPosX += gridSpacing;
         }
-
-        GenerateBoard();
 
         // Fit grid to screen.
         CameraFit cameraFit = Camera.main.GetComponent<CameraFit>();
@@ -139,52 +175,25 @@ public class GameBoard : MonoBehaviour
                                transform.position.y - (gridSpacing / 2.0f),
                                 gridX * gridSpacing,
                                 gridY * gridSpacing));
+
+        state = BoardState.Idle; // Start board in idle state.
     }
 
-    private void GenerateBoard()
-    {
-        int numAnimalTypes = AnimalType.GetNames(typeof(AnimalType)).Length;
-
-        for (int x = 0; x < gridX; x++)
-        {
-            for (int y = 0; y < gridY; y++)
-            {
-                animalGrid[x, y].Type = (AnimalType)Random.Range(0, numAnimalTypes);
-            }
-        }
-    }
-
+    // Generate a new random animal.
     private Animal MakeRandomAnimal(int x, int y)
     {
         Animal newAnimal  = Instantiate(animalPrefab, new Vector3(x, y, 0), Quaternion.identity, this.transform);
+
         newAnimal.name = "Animal_" + x + "_" + y;
         newAnimal.X = x;
         newAnimal.Y = y;
-
-        int numAnimalTypes = AnimalType.GetNames(typeof(AnimalType)).Length;
-        newAnimal.Type = (AnimalType)Random.Range(0, numAnimalTypes);
-
+        newAnimal.Type = (AnimalType)Random.Range(0, AnimalType.GetNames(typeof(AnimalType)).Length);
         newAnimal.transform.position = transform.position + new Vector3(x * gridSpacing, y * gridSpacing, 0.0f);
-        newAnimal.transform.parent = transform;
 
         return newAnimal;
     }
 
-    private void ClearMatchScratch()
-    {
-
-        matchList.Clear();
-
-        for (int x = 0; x < gridX; x++)
-        {
-            for (int y = 0; y < gridY; y++)
-            {
-                scratchGrid[x, y] = false;
-            }
-        }
-    }
-
-    // Flood-fill algorithm
+    // This function *recursively* calls itself to build up a list of animals that match the one at (x,y)
     private void CheckMatch(int x, int y, AnimalType typeMatch)
     {
         if (x < 0 || y < 0 || x >= gridX || y >= gridY)
@@ -207,55 +216,36 @@ public class GameBoard : MonoBehaviour
             return; // Already checked this square
         }
 
-        scratchGrid[x, y] = true;
+        scratchGrid[x, y] = true; // Ensure we don't check this square again.
 
-        CheckMatch(x - 1, y, typeMatch); // Recursively call this function.
+        // Uses flood-fill algorithm to detect matches.
+        // https://en.wikipedia.org/wiki/Flood_fill
+
+        CheckMatch(x - 1, y, typeMatch); // *Recursion* is when a function calls itself.
         CheckMatch(x + 1, y, typeMatch);
         CheckMatch(x, y - 1, typeMatch);
         CheckMatch(x, y + 1, typeMatch);
 
         matchList.Add(animalGrid[x, y]);
-
     }
 
-    public void Select(int x, int y)
+
+    // Clear scratch variables used in match-detecting algorithm.
+    private void ClearMatchScratch()
     {
-        if (state != BoardState.Idle)
-        {
-            return; // Can't interact with board unless in idle state.
-        }
+        matchList.Clear();
 
-        ClearMatchScratch();
-        CheckMatch(x, y, animalGrid[x, y].Type);
-
-        if (matchList.Count >= MATCH_SIZE)
+        for (int x = 0; x < gridX; x++)
         {
-            foreach (Animal a in matchList)
+            for (int y = 0; y < gridY; y++)
             {
-                a.StartRemoving();
-            }
-
-            state = BoardState.Matching;
-        }
-        else
-        {
-            state = BoardState.Idle;
-        }
-    }
-
-    public Sprite GetAnimalSprite(AnimalType type)
-    {
-        foreach (AnimalDef def in animalDefs)
-        {
-            if (def.type == type)
-            {
-                return def.sprite;
+                scratchGrid[x, y] = false;
             }
         }
-
-        return null;
     }
 
+
+    // Enter board falling state
     private void SetBoardFalling()
     {
         state = BoardState.Falling;
@@ -272,6 +262,7 @@ public class GameBoard : MonoBehaviour
                 }
                 else if (fallDistance > 0)
                 {
+                    // Set animals to fall to fill up the gaps in the grid left by matches.
                     Vector3 start = animalGrid[x, y].transform.position;
                     Vector3 dest = start - new Vector3(0.0f, fallDistance * gridSpacing, 0.0f);
                     animalGrid[x, y].SetFalling(fallDistance, start, dest);
@@ -281,11 +272,13 @@ public class GameBoard : MonoBehaviour
         }
     }
 
+    // Fill up the empty grid squares left by matches.
     private void FillEmptySquares()
     {
         for (int x = 0; x < gridX; x++)
         {
             int fallDistance = 0;
+
             // Calculate distance to fall
             for (int y = 0; y < gridY; y++)
             {
@@ -299,8 +292,10 @@ public class GameBoard : MonoBehaviour
             {
                 if (animalGrid[x, y] == null)
                 {
+                    // Create new animal.
                     animalGrid[x, y] = MakeRandomAnimal(x, y);
 
+                    // Set new animal falling into grid.
                     Vector3 dest = animalGrid[x, y].transform.position;
                     Vector3 start = dest + new Vector3(0.0f, fallDistance * gridSpacing, 0.0f);
                     animalGrid[x, y].transform.position = start;
@@ -317,6 +312,7 @@ public class GameBoard : MonoBehaviour
         animalGrid[x1, y1] = animalGrid[x2, y2];
         animalGrid[x2, y2] = temp;
 
+        // Update Animal's knowledge of its position in the grid.
         if (animalGrid[x1, y1] != null)
         {
             animalGrid[x1, y1].X = x1;
