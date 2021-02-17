@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public enum AnimalType { Cat, Chick, Fox, Mouse, Pig, Rabbit }; 
-public enum AnimalState { Idle, Moving, Matching};
 
 /* An Animal is a game piece object that is held in an array in GameBoard.
  * Animals may be idle (waiting for clicks),
@@ -29,7 +28,6 @@ public class Animal : MonoBehaviour
     private AnimalType _type; // Backing variable for Type.
 
     // Getters/setters
-    public AnimalState State { get; set; }
     public int X {get; set;}
     public int Y { get; set; }
 
@@ -39,14 +37,20 @@ public class Animal : MonoBehaviour
     private SpriteRenderer sprRenderer; // Link to the Sprite Renderer.
 
     // Lerp move
-    private Vector3 lerpOrigin;// Where the animal is lerping from.
-    private Vector3 lerpTarget;// Where the animal is lerping to.
-    private float lerpTime; // Lerp progress
-    private float lerpTimeMax; // Lerp maximum
+    public Vector3 lerpOrigin;// Where the animal is lerping from.
+    public Vector3 lerpTarget;// Where the animal is lerping to.
+    public float lerpTime; // Lerp progress
+    public float lerpTimeMax; // Lerp maximum
 
     // Constants
     private const float FALL_LERP_TIME = 0.2f;
     private const float MATCH_LERP_TIME = 0.5f;
+
+    // States
+    public AnimalStateBase currentState = null;
+    public AnimalStateIdle stateIdle = new AnimalStateIdle();
+    public AnimalStateFalling stateFalling = new AnimalStateFalling();
+    public AnimalStateMatching stateMatching = new AnimalStateMatching();
 
     /* Awake runs as soon as the object is instantiated, unlike Start() which runs just before the first Update() loop is called.
        This is important because we instantiate Animal objects in code and access them right away.
@@ -57,38 +61,18 @@ public class Animal : MonoBehaviour
         // This means we only need to get them once, saving time over getting them whenever used.
         board = GetComponentInParent<GameBoard>();
         sprRenderer = GetComponent<SpriteRenderer>();
+
+        currentState = stateIdle;
     }
 
     void Start()
     {
-
+        
     }
 
     void Update()
     {
-        // Different behaviour depending on current state.
-        if (State == AnimalState.Moving)
-        {
-            lerpTime += Time.deltaTime;
-            if (lerpTime > lerpTimeMax)
-            {
-                lerpTime = lerpTimeMax;
-                State = AnimalState.Idle;
-            }
-
-            transform.position = Vector3.Lerp(lerpOrigin, lerpTarget, lerpTime / lerpTimeMax);
-        }
-        else if (State == AnimalState.Matching)
-        {
-            lerpTime += Time.deltaTime;
-            if (lerpTime > lerpTimeMax)
-            {
-                lerpTime = lerpTimeMax;
-              
-            }
-
-            transform.localScale = Vector3.Lerp(lerpOrigin, lerpTarget, lerpTime / lerpTimeMax);
-        }
+        currentState.Update(this);
     }
 
     // Is the current Lerp finished?
@@ -97,16 +81,11 @@ public class Animal : MonoBehaviour
         return lerpTime >= lerpTimeMax;
     }
 
-    // Triggers when Animal object is clicked.
-    private void OnMouseUp()
-    {
-        board.Select(X, Y);
-    }
 
     // Move to matching state.
     public void StartRemoving()
     {
-        State = AnimalState.Matching;
+        ChangeState(stateMatching);
         lerpOrigin = transform.localScale;
         lerpTarget = Vector3.zero;
         lerpTime = 0.0f;
@@ -117,10 +96,23 @@ public class Animal : MonoBehaviour
     // Move to falling state.
     public void SetFalling(int dist, Vector3 start, Vector3 destination)
     {
-        State = AnimalState.Moving;
+        ChangeState(stateFalling);
         lerpOrigin = start;
         lerpTarget = destination;
         lerpTime = 0.0f;
         lerpTimeMax = FALL_LERP_TIME * dist;
+    }
+
+    /*******************/
+    /* STATE FUNCTIONS */
+    /*******************/
+    public void ChangeState(AnimalStateBase newState)
+    {
+        if (currentState != null)
+        {
+            currentState.LeaveState(this);
+        }
+        currentState = newState;
+        currentState.EnterState(this);
     }
 }

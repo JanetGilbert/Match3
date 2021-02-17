@@ -10,7 +10,7 @@ public struct AnimalDef
     public Sprite sprite;
 }
 
-public enum BoardState {Idle, Matching, Falling}; // The states that the board can be in.
+//public enum BoardState {Idle, Matching, Falling}; // The states that the board can be in.
 
 /* This is the master control object for the bubble popping game. 
  * It contains and initializes the game pieces (animals)
@@ -33,14 +33,18 @@ public class GameBoard : MonoBehaviour
     public AnimalDef[] animalDefs;
 
     // The board
-    private Animal[,] animalGrid;
+    public Animal[,] animalGrid;
 
     // For checking matches
     private bool[,] scratchGrid; // Grid to ensure we don't check a square twice.
     private List<Animal> matchList; // Animals in current match.
 
     // State
-    private BoardState state;
+    //private BoardState state;
+    public BoardStateBase currentState = null;
+    public BoardStateIdle stateIdle = new BoardStateIdle();
+    public BoardStateFalling stateFalling = new BoardStateFalling();
+    public BoardStateMatching stateMatching = new BoardStateMatching();
 
     void Start()
     {
@@ -52,76 +56,14 @@ public class GameBoard : MonoBehaviour
 
     void Update()
     {
-        // Update states.
-        if (state == BoardState.Matching) // Matching State
-        {
-            bool stillMatching = false;
-
-            for (int x = 0; x < gridX; x++)
-            {
-                for (int y = 0; y < gridY; y++)
-                {
-                    if (animalGrid[x, y] != null && animalGrid[x, y].State == AnimalState.Matching)
-                    {
-                        // Destroy animal when shrinking animation is finished.
-                        if (animalGrid[x, y].IsLerpFinished())
-                        {
-                            Destroy(animalGrid[x, y].gameObject);
-                            animalGrid[x, y] = null;
-                        }
-                        else
-                        {
-                            stillMatching = true;
-                        }
-                    }
-                }
-            }
-            // Change to falling state when all matched animals have disappeared.
-            if (!stillMatching)
-            {
-                SetBoardFalling();
-                FillEmptySquares();
-                state = BoardState.Falling;
-            }
-        }
-        else if (state == BoardState.Falling) // Falling state
-        {
-            bool stillFalling = false;
-
-            for (int x = 0; x < gridX; x++)
-            {
-                for (int y = 0; y < gridY; y++)
-                {
-                    if (animalGrid[x, y] != null)
-                    {
-                        if (animalGrid[x, y].State == AnimalState.Moving && !animalGrid[x, y].IsLerpFinished())
-                        {
-                            stillFalling = true;
-                        }
-                    }
-                }
-            }
-
-            // Change to idle state when all animals have fallen into place.
-            if (!stillFalling)
-            {
-                
-                state = BoardState.Idle;
-            }
-        }
+        currentState.Update(this);
     }
 
-    // Interact with board by selecting animal object.
-    public void Select(int x, int y)
+    public void CheckMatch(Animal animal)
     {
-        if (state != BoardState.Idle)
-        {
-            return; // Can't interact with board unless in idle state.
-        }
-
         // Check whether the animal that was clicked is part of a group of x of the same type.
         ClearMatchScratch();
-        CheckMatch(x, y, animalGrid[x, y].Type);
+        CheckMatch(animal.X, animal.Y, animalGrid[animal.X, animal.Y].Type);
 
         // If a matching animal group was found, remove them.
         if (matchList.Count >= matchSize)
@@ -131,7 +73,7 @@ public class GameBoard : MonoBehaviour
                 a.StartRemoving();
             }
 
-            state = BoardState.Matching;
+            ChangeState(stateMatching);
         }
     }
 
@@ -148,10 +90,6 @@ public class GameBoard : MonoBehaviour
 
         return null;
     }
-
-    /*********************/
-    /* PRIVATE FUNCTIONS */
-    /*********************/
 
     // Create a grid of animal objects and initialize it randomly.
     private void InitGrid()
@@ -176,7 +114,7 @@ public class GameBoard : MonoBehaviour
                                 gridX * gridSpacing,
                                 gridY * gridSpacing));
 
-        state = BoardState.Idle; // Start board in idle state.
+        ChangeState(stateIdle); // Start board in idle state.
     }
 
     // Generate a new random animal.
@@ -246,10 +184,8 @@ public class GameBoard : MonoBehaviour
 
 
     // Enter board falling state
-    private void SetBoardFalling()
+    public void SetBoardFalling()
     {
-        state = BoardState.Falling;
-
         for (int x = 0; x < gridX; x++)
         {
             int fallDistance = 0;
@@ -273,7 +209,7 @@ public class GameBoard : MonoBehaviour
     }
 
     // Fill up the empty grid squares left by matches.
-    private void FillEmptySquares()
+    public void FillEmptySquares()
     {
         for (int x = 0; x < gridX; x++)
         {
@@ -326,5 +262,19 @@ public class GameBoard : MonoBehaviour
             animalGrid[x2, y2].Y = y2;
             animalGrid[x2, y2].name = "Animal_" + x2 + "_" + y2;
         }
+    }
+
+
+    /*******************/
+    /* STATE FUNCTIONS */
+    /*******************/
+    public void ChangeState(BoardStateBase newState)
+    {
+        if (currentState != null)
+        {
+            currentState.LeaveState(this);
+        }
+        currentState = newState;
+        currentState.EnterState(this);
     }
 }
